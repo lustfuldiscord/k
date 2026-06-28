@@ -111,3 +111,10 @@ CREATE TABLE IF NOT EXISTS nicklock (
     nickname TEXT,
     PRIMARY KEY (guild_id, user_id)
 );
+
+-- Automated Honeypot Trap Channel Configurations
+CREATE TABLE IF NOT EXISTS honeypots (
+    guild_id INTEGER,
+    channel_id INTEGER,
+    PRIMARY KEY (guild_id, channel_id)
+);
