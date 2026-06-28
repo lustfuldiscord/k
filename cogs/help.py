@@ -1,77 +1,90 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 DARK_COLOR = discord.Color.from_rgb(47, 49, 54)
 
-class Help(commands.Cog):
+class HelpCommand(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="help", description="List all available commands or get details on a specific command.")
-    @discord.app_commands.describe(command="The specific command you want to inspect")
-    async def help_command(self, ctx: commands.Context, *, command: str = None):
-        """Displays a menu of all available modules or details for a specific command."""
-        pref = ctx.prefix
+    @commands.hybrid_command(name="help")
+    @app_commands.describe(command="Specific command to view details for")
+    async def help_command(self, ctx, *, command: str = None):
+        """View available commands or get details on a specific command."""
+        pref = await self.bot.get_prefix(ctx.message)
+        pref = pref[0] if isinstance(pref, list) else pref
 
-        # --- Scenario 1: Detailed Help for a Specific Command/Group ---
-        if command:
-            target = self.bot.get_command(command)
-            if not target:
-                return await ctx.send(embed=discord.Embed(
-                    description=f"Command `{command}` could not be found.", 
-                    color=DARK_COLOR
-                ))
-
+        if not command:
             embed = discord.Embed(
-                title=f"Command Help: {target.qualified_name}",
-                description=target.help or "No description provided.",
+                title="Help Menu", 
+                description=f"Use `{pref}help <command>` for usage details.", 
                 color=DARK_COLOR
             )
             
-            # Show aliases if they exist
-            if target.aliases:
-                embed.add_field(name="Aliases", value=", ".join(target.aliases), inline=False)
-                
-            # Show syntax usage format
-            syntax = f"{pref}{target.qualified_name} {target.signature}"
-            embed.add_field(name="Usage Syntax", value=f"`{syntax}`", inline=False)
-
-            # If it's a command group (like autorole, honeypot, vanity), list its subcommands
-            if isinstance(target, commands.Group):
-                subcmds = [f"`{c.name}` - {c.short_doc}" for c in target.commands]
-                if subcmds:
-                    embed.add_field(name="Available Subcommands", value="\n".join(subcmds), inline=False)
-
+            embed.add_field(
+                name="Prefix", 
+                value=f"`{pref}prefix`, `{pref}prefix self`, `{pref}prefix set`, `{pref}prefix remove`", 
+                inline=False
+            )
+            embed.add_field(
+                name="Moderation", 
+                value=f"`{pref}ban`, `{pref}kick`, `{pref}mute`, `{pref}unmute`, `{pref}timeout`, `{pref}untimeout`, `{pref}jail`, `{pref}warn`, `{pref}softban`, `{pref}lock`, `{pref}purge`, `{pref}nicklock`", 
+                inline=False
+            )
+            embed.add_field(
+                name="Setup",
+                value=f"`{pref}setup`",
+                inline=False
+            )
+            embed.add_field(
+                name="Welcome",
+                value=f"`{pref}welcomeset`, `{pref}testwelcome`",
+                inline=False
+            )
+            embed.add_field(
+                name="Utility", 
+                value=f"`{pref}alias`, `{pref}imgonly`, `{pref}invoke`, `{pref}roblox`, `{pref}snipe`, `{pref}afk`, `{pref}role`", 
+                inline=False
+            )
+            embed.add_field(
+                name="Settings", 
+                value=f"`{pref}settings`, `{pref}settings welcomechannel`, `{pref}settings baserole`, `{pref}settings muterole`, `{pref}settings jailrole`, `{pref}settings modlogs`, `{pref}settings joinlogs`, `{pref}settings autonick`, `{pref}autorole`, `{pref}autorole set`, `{pref}autorole remove`, `{pref}honeypot`, `{pref}honeypot add`, `{pref}honeypot remove`, `{pref}honeypot list`, `{pref}vanity set`, `{pref}vanity remove`, `{pref}vanity view`", 
+                inline=False
+            )
+            embed.add_field(
+                name="Boosterrole", 
+                value=f"`{pref}boosterrole`, `{pref}boosterrole setup`, `{pref}boosterrole claim`, `{pref}boosterrole name`, `{pref}boosterrole color`, `{pref}boosterrole icon`, `{pref}boosterrole delete`, `{pref}boosterrole list`, `{pref}boosterrole filter`", 
+                inline=False
+            )
+            embed.add_field(
+                name="Voice Systems",
+                value=f"`{pref}vcsetup`",
+                inline=False
+            )
+            
             return await ctx.send(embed=embed)
 
-        # --- Scenario 2: Main Help Menu (List all Cogs and Commands) ---
-        embed = discord.Embed(
-            title=f"{self.bot.user.name} Help Menu",
-            description=f"Use `{pref}help <command>` to get more specific information on any command layout.",
-            color=DARK_COLOR
-        )
+        target_cmd = self.bot.get_command(command.lower())
+        
+        if not target_cmd:
+            return await ctx.send(embed=discord.Embed(description="Command not found.", color=DARK_COLOR))
 
-        for cog_name, cog in self.bot.cogs.items():
-            # Skip the Help cog itself or cogs with hidden commands to keep the menu clean
-            if cog_name.lower() == "help":
-                continue
+        embed = discord.Embed(title=f"Command: {target_cmd.qualified_name}", color=DARK_COLOR)
+        embed.add_field(name="Description", value=target_cmd.help or "No description provided.", inline=False)
+        
+        usage = f"`{pref}{target_cmd.qualified_name} {target_cmd.signature}`"
+        embed.add_field(name="Usage", value=usage, inline=False)
 
-            # Get visible commands in this specific cog
-            visible_commands = [
-                f"`{c.name}`" for c in cog.get_commands() 
-                if not c.hidden
-            ]
+        if target_cmd.aliases:
+            embed.add_field(name="Aliases", value=", ".join([f"`{a}`" for a in target_cmd.aliases]), inline=False)
 
-            if visible_commands:
-                # Clean up the name styling for the fields (e.g., cogs.moderation -> Moderation)
-                display_name = cog_name.replace("cogs.", "").title()
-                embed.add_field(
-                    name=f"⚙️ {display_name} Module",
-                    value=" ".join(visible_commands),
-                    inline=False
-                )
+        if isinstance(target_cmd, commands.Group):
+            subcommands = [f"`{sub.name}`" for sub in target_cmd.commands]
+            if subcommands:
+                embed.add_field(name="Subcommands", value=", ".join(subcommands), inline=False)
 
         await ctx.send(embed=embed)
 
 async def setup(bot):
-    await bot.add_cog(Help(bot))
+    await bot.add_cog(HelpCommand(bot))
