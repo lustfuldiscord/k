@@ -24,6 +24,30 @@ class Moderation(commands.Cog):
 
     # --- Core Moderation Actions ---
 
+    @commands.hybrid_command(name="lock")
+    @commands.has_permissions(manage_channels=True)
+    @app_commands.describe(channel="The channel to lock down. Defaults to the current channel.")
+    async def m_lock(self, ctx, channel: discord.TextChannel = None):
+        """Lock down a channel to prevent regular members from typing."""
+        channel = channel or ctx.channel
+        
+        # Pull the @everyone role permissions override configuration
+        overwrite = channel.overwrites_for(ctx.guild.default_role)
+        
+        # Check if it's already locked to prevent unnecessary API spam
+        if overwrite.send_messages is False:
+            return await ctx.send(embed=discord.Embed(description=f"{channel.mention} is already locked.", color=DARK_COLOR))
+            
+        overwrite.send_messages = False
+        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrite, reason=f"Channel locked by {ctx.author}")
+        
+        # Add the lock reaction directly to the invocation message
+        try:
+            await ctx.message.add_reaction("🔒")
+        except discord.Forbidden:
+            # Fallback text if the bot lacks Add Reactions permissions in this channel
+            await ctx.send(embed=discord.Embed(description=f"Locked {channel.mention} successfully.", color=DARK_COLOR))
+
     @commands.hybrid_command(name="ban")
     @commands.has_permissions(ban_members=True)
     @app_commands.describe(member="The user profile targeted for exclusion", args="Reason and flags like --do action")
