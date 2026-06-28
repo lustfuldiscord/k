@@ -44,6 +44,20 @@ class CoreBot(commands.Bot):
             await self.db.executescript(f.read())
         await self.db.commit()
 
+        # Dynamic Database Safe-Patching Routine
+        async with self.db.execute("PRAGMA table_info(guild_settings);") as cursor:
+            columns = [row[1] for row in await cursor.fetchall()]
+
+        # Inject missing structural elements dynamically if skipped by caching engines
+        if "autorole_id" not in columns:
+            await self.db.execute("ALTER TABLE guild_settings ADD COLUMN autorole_id INTEGER DEFAULT NULL;")
+        if "muterole_id" not in columns:
+            await self.db.execute("ALTER TABLE guild_settings ADD COLUMN muterole_id INTEGER DEFAULT NULL;")
+        if "welcome_channel_id" not in columns:
+            await self.db.execute("ALTER TABLE guild_settings ADD COLUMN welcome_channel_id INTEGER DEFAULT NULL;")
+            
+        await self.db.commit()
+
         initial_extensions = [
             "cogs.prefix",
             "cogs.boosterrole",
