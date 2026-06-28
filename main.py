@@ -29,7 +29,6 @@ async def get_prefix(bot, message):
 class CoreBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.all()
-        # Explicit owner tracking assigned directly to your administrator account ID
         super().__init__(
             command_prefix=get_prefix, 
             intents=intents, 
@@ -71,11 +70,6 @@ class CoreBot(commands.Bot):
         self.tree.on_error = self.on_app_command_error
         await self.tree.sync()
 
-    async def on_message(self, message: discord.Message):
-        if message.author.bot:
-            return
-        await self.process_commands(message)
-
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         error = getattr(error, 'original', error)
 
@@ -104,6 +98,14 @@ bot = CoreBot()
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user} ({bot.user.id})")
+
+# Clean global message listener that allows command processing alongside cog hooks
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+        
+    await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
