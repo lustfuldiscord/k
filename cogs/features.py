@@ -105,7 +105,6 @@ class Features(commands.Cog):
                         await log_channel.send(embed=log_embed)
             except discord.Forbidden:
                 pass
-            return
 
 async def setup(bot):
     await bot.add_cog(Features(bot))
