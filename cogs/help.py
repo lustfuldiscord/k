@@ -29,7 +29,7 @@ class HelpCommand(commands.Cog):
             )
             embed.add_field(
                 name="Moderation", 
-                value=f"`{pref}ban`, `{pref}kick`, `{pref}mute`, `{pref}unmute`, `{pref}timeout`, `{pref}untimeout`, `{pref}jail`, `{pref}warn`, `{pref}softban`, `{pref}lock`, `{pref}purge`, `{pref}nicklock`", 
+                value=f"`{pref}ban`, `{pref}kick`, `{pref}mute`, `{pref}unmute`, `{pref}timeout`, `{pref}untimeout`, `{pref}jail`, `{pref}warn`, `{pref}softban`, `{pref}lock`, `{pref}purge`, `{pref}nicklock`, `{pref}honeypot`", 
                 inline=False
             )
             embed.add_field(
