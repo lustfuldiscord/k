@@ -10,7 +10,7 @@ class Moderation(commands.Cog):
         self.bot = bot
 
     def parse_flags(self, argument_list):
-        """Parse flags like --do action out of a command argument list string."""
+        """Parse raw lists extracting flag metrics arguments like --do smoothly."""
         flags = {"do": None}
         if "--do" in argument_list:
             try:
@@ -24,147 +24,160 @@ class Moderation(commands.Cog):
 
     # --- Core Moderation Actions ---
 
-    @commands.hybrid_command(name="lock")
-    @commands.has_permissions(manage_channels=True)
-    @app_commands.describe(channel="The channel to lock down. Defaults to the current channel.")
-    async def m_lock(self, ctx, channel: discord.TextChannel = None):
-        """Lock down a channel to prevent members from sending messages."""
-        channel = channel or ctx.channel
-        
-        overwrite = channel.overwrites_for(ctx.guild.default_role)
-        
-        if overwrite.send_messages is False:
-            return await ctx.send(embed=discord.Embed(description=f"{channel.mention} is already locked.", color=DARK_COLOR))
+    @commands.hybrid_command(name="purge", aliases=["clear"])
+    @commands.has_permissions(manage_messages=True)
+    @commands.bot_has_permissions(manage_messages=True)
+    @app_commands.describe(amount="The number of messages to delete from this channel")
+    async def m_purge(self, ctx: commands.Context, amount: int):
+        """Purge historical message activity traces instantly from the current channel."""
+        if amount <= 0:
+            return await ctx.send(embed=discord.Embed(description="❌ Please specify an amount greater than 0.", color=DARK_COLOR))
             
-        overwrite.send_messages = False
-        await channel.set_permissions(ctx.guild.default_role, overwrite=overwrite, reason=f"Channel locked by {ctx.author}")
+        # Limit to a safe number to avoid rate-limiting spikes
+        amount = min(amount, 100)
         
+        # Defer interaction if invoked via slash command to give API time to process bulk drops
+        if ctx.interaction:
+            await ctx.defer(ephemeral=True)
+
         try:
-            await ctx.message.add_reaction("🔒")
+            # If using text command, add 1 to clear the invoking message too
+            purge_limit = amount if ctx.interaction else amount + 1
+            
+            # bulk=True automatically filters out and skips messages older than 14 days
+            deleted = await ctx.channel.purge(limit=purge_limit, bulk=True)
+            
+            actual_deleted = len(deleted) if ctx.interaction else len(deleted) - 1
+            success_embed = discord.Embed(
+                description=f"🧹 Cleaned up `{actual_deleted}` messages tracking traces.", 
+                color=DARK_COLOR
+            )
+            
+            await ctx.send(embed=success_embed, delete_after=3)
         except discord.Forbidden:
-            await ctx.send(embed=discord.Embed(description=f"Locked {channel.mention} successfully.", color=DARK_COLOR))
+            await ctx.send(embed=discord.Embed(description="❌ System permission failure. Access denied.", color=DARK_COLOR))
+        except discord.HTTPException as e:
+            await ctx.send(embed=discord.Embed(description=f"❌ Network operation failed: `{e}`", color=DARK_COLOR))
 
     @commands.hybrid_command(name="ban")
     @commands.has_permissions(ban_members=True)
-    @app_commands.describe(member="The member to ban from the server", args="Reason for the ban. Can include flags like --do <action>")
+    @app_commands.describe(member="The user profile targeted for exclusion", args="Reason and flags like --do action")
     async def m_ban(self, ctx, member: discord.Member, *, args: str = ""):
-        """Ban a member from the server. Supports optional flags."""
+        """Execute server exclusion protocols targeting accounts. Supports --do flags."""
         if member.top_role >= ctx.author.top_role and ctx.author.id != ctx.guild.owner_id:
-            return await ctx.send(embed=discord.Embed(description="You cannot ban a member with an equal or higher role hierarchy positioning.", color=DARK_COLOR))
+            return await ctx.send(embed=discord.Embed(description="You cannot moderate a member with an equal or higher role hierarchy positioning.", color=DARK_COLOR))
 
-        # Split arguments to pull out possible flags safely
-        argument_list = args.split()
-        flags, reason = self.parse_flags(argument_list)
-        reason = reason or "No reason specified."
+        flags, reason = self.parse_flags(args.split())
+        reason = reason or "No specified incident reasons recorded."
         
         await member.ban(reason=reason)
         
-        embed = discord.Embed(title="User Banned Successfully", color=DARK_COLOR)
-        embed.add_field(name="Target User", value=f"{member.name} (ID: {member.id})", inline=False)
-        embed.add_field(name="Reason", value=reason, inline=False)
+        embed = discord.Embed(title="Exclusion Protocol Deployed", color=DARK_COLOR)
+        embed.add_field(name="Target Account Entity", value=f"{member.name} (ID: {member.id})", inline=False)
+        embed.add_field(name="Infraction Specification Text", value=reason, inline=False)
         if flags["do"]:
-            embed.add_field(name="Follow-up Action Triggered", value=flags['do'], inline=False)
+            embed.add_field(name="Execution Step Directives Flag Action", value=f"Triggered follow-up: {flags['do']}", inline=False)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="kick")
     @commands.has_permissions(kick_members=True)
-    @app_commands.describe(member="The member to kick from the server", reason="The reason for the kick")
-    async def m_kick(self, ctx, member: discord.Member, *, reason: str = "No reason specified."):
-        """Kick a member from the server."""
+    @app_commands.describe(member="The user profile targeted for eviction", reason="The documented reason for removal")
+    async def m_kick(self, ctx, member: discord.Member, *, reason: str = "No rationale documented."):
+        """Eject accounts instantly out from current tracking population."""
         if member.top_role >= ctx.author.top_role and ctx.author.id != ctx.guild.owner_id:
-            return await ctx.send(embed=discord.Embed(description="You cannot kick a member with an equal or higher role hierarchy positioning.", color=DARK_COLOR))
+            return await ctx.send(embed=discord.Embed(description="Hierarchy layout check failed. Target possesses superior privileges.", color=DARK_COLOR))
 
         await member.kick(reason=reason)
-        await ctx.send(embed=discord.Embed(description=f"Successfully kicked {member.mention}.", color=DARK_COLOR))
+        await ctx.send(embed=discord.Embed(description=f"Eviction completed processing entity account user {member.mention}.", color=DARK_COLOR))
 
     @commands.hybrid_command(name="mute")
     @commands.has_permissions(manage_roles=True)
-    @app_commands.describe(member="The member to mute", reason="The reason for the mute")
+    @app_commands.describe(member="Target member account profile", reason="Action parameters index rationale")
     async def m_mute(self, ctx, member: discord.Member, *, reason: str = "None"):
-        """Apply a mute role status over a user profile."""
-        await ctx.send(embed=discord.Embed(description=f"Muted {member.mention}.", color=DARK_COLOR))
+        """Apply structural restrictions blocks inhibiting speech capabilities fields."""
+        await ctx.send(embed=discord.Embed(description=f"Mute profile states tracking updated over target user member: {member.mention}", color=DARK_COLOR))
 
     @commands.hybrid_command(name="unmute")
     @commands.has_permissions(manage_roles=True)
-    @app_commands.describe(member="The member to unmute")
+    @app_commands.describe(member="Target member account profile")
     async def m_unmute(self, ctx, member: discord.Member):
-        """Remove mute role status from a user profile."""
-        await ctx.send(embed=discord.Embed(description=f"Unmuted {member.mention}.", color=DARK_COLOR))
+        """Lift operational silencing profiles arrays directly down."""
+        await ctx.send(embed=discord.Embed(description=f"Restored voice capabilities fields parameters targeting user account {member.mention}.", color=DARK_COLOR))
 
     @commands.hybrid_command(name="timeout")
     @commands.has_permissions(moderate_members=True)
-    @app_commands.describe(member="The member to timeout", minutes="Duration of the timeout in minutes", reason="The reason for the timeout")
+    @app_commands.describe(member="Target member account profile", minutes="Duration index scale in minutes", reason="Action parameters index rationale")
     async def m_timeout(self, ctx, member: discord.Member, minutes: int, *, reason: str = "None"):
-        """Timeout a member to stop them from talking or reacting entirely."""
+        """Impose internal API communication blocks over target members."""
         if member.top_role >= ctx.author.top_role and ctx.author.id != ctx.guild.owner_id:
-            return await ctx.send(embed=discord.Embed(description="You cannot timeout a member with an equal or higher role hierarchy positioning.", color=DARK_COLOR))
+            return await ctx.send(embed=discord.Embed(description="Action restricted due to structural authority hierarchy positioning.", color=DARK_COLOR))
 
         duration = datetime.timedelta(minutes=minutes)
         await member.timeout(duration, reason=reason)
-        await ctx.send(embed=discord.Embed(description=f"Timed out {member.mention} for {minutes} minutes.", color=DARK_COLOR))
+        await ctx.send(embed=discord.Embed(description=f"Target communication channels blocked tracking for duration parameters: {minutes} minutes.", color=DARK_COLOR))
 
     @commands.hybrid_command(name="untimeout")
     @commands.has_permissions(moderate_members=True)
-    @app_commands.describe(member="The member to remove from timeout")
+    @app_commands.describe(member="Target member account profile")
     async def m_untimeout(self, ctx, member: discord.Member):
-        """Instantly lift a timeout from a member."""
+        """Purge ongoing timeout parameters arrays instantly."""
         await member.timeout(None)
-        await ctx.send(embed=discord.Embed(description=f"Removed timeout status from {member.mention}.", color=DARK_COLOR))
+        await ctx.send(embed=discord.Embed(description=f"Lifted internal timing block locks limiting profile accounts: {member.mention}", color=DARK_COLOR))
 
-    @commands.hybrid_command(name="jail")
+    @commands.hybrid_group(name="jail")
     @commands.has_permissions(manage_messages=True)
-    @app_commands.describe(member="The member to place in jail", reason="The reason for jail placement")
+    @app_commands.describe(member="Target account mapping profile", reason="Action parameters index rationale")
     async def m_jail(self, ctx, member: discord.Member, *, reason: str = "None"):
-        """Isolate a user by forcing them into the server's tracking holding cell channel."""
-        await ctx.send(embed=discord.Embed(description=f"Jailed {member.mention} successfully.", color=DARK_COLOR))
+        """Route structural identities maps straight down inside holding patterns parameters channels."""
+        await ctx.send(embed=discord.Embed(description=f"Isolation processing targets successfully relocated out inside target cell space nodes loops targeting user: {member.mention}", color=DARK_COLOR))
 
     @commands.hybrid_command(name="warn")
     @commands.has_permissions(manage_messages=True)
-    @app_commands.describe(member="The member to warn", reason="The documented reason for the infraction warning")
+    @app_commands.describe(member="Target account mapping profile", reason="Documented verification string")
     async def m_warn(self, ctx, member: discord.Member, *, reason: str):
-        """Log a formal warning infraction against a user's account history."""
-        await ctx.send(embed=discord.Embed(description=f"Logged warning against user member entity {member.mention}.", color=DARK_COLOR))
+        """Log documented infraction metrics indicators mapping account histories files."""
+        await ctx.send(embed=discord.Embed(description=f"Infraction warning entry files successfully appended tracking databases markers targeting member entity {member.mention}.", color=DARK_COLOR))
 
     @commands.hybrid_command(name="softban")
     @commands.has_permissions(ban_members=True)
-    @app_commands.describe(member="The member to softban", reason="The reason for the softban tracking logs")
+    @app_commands.describe(member="Target account mapping profile", reason="Action parameters index rationale")
     async def m_softban(self, ctx, member: discord.Member, *, reason: str = "None"):
-        """Kick a user and clear their recent history by banning and instantly unbanning them."""
+        """Purge historical message activity traces instantly using rapid purge cycles loops formats."""
         if member.top_role >= ctx.author.top_role and ctx.author.id != ctx.guild.owner_id:
-            return await ctx.send(embed=discord.Embed(description="You cannot softban a member with an equal or higher role hierarchy positioning.", color=DARK_COLOR))
+            return await ctx.send(embed=discord.Embed(description="Action restricted due to structural authority hierarchy positioning.", color=DARK_COLOR))
 
-        await member.ban(reason=f"Softban (Messages Purged): {reason}", delete_message_days=7)
+        await member.ban(reason=f"Softban verification purge: {reason}", delete_message_days=7)
         await ctx.guild.unban(member)
-        await ctx.send(embed=discord.Embed(description=f"Softbanned {member.mention} and successfully cleared their messages.", color=DARK_COLOR))
+        await ctx.send(embed=discord.Embed(description=f"Historical data tracking arrays wiped down cleanly across target account reference points user entity {member.mention}.", color=DARK_COLOR))
 
     # --- Informational Queries ---
 
     @commands.hybrid_command(name="userinfo", aliases=["ui", "whois"])
-    @app_commands.describe(member="The member whose profile data you want to view")
+    @app_commands.describe(member="Target member account profile metadata context")
     async def m_userinfo(self, ctx, member: discord.Member = None):
-        """Display analytical profile metadata about a server member."""
+        """Audit properties values logs representing accounts attributes records profiles."""
         member = member or ctx.author
-        embed = discord.Embed(title=f"User Info - {member.name}", color=DARK_COLOR)
-        embed.add_field(name="Account ID", value=str(member.id), inline=True)
-        embed.add_field(name="Account Created", value=member.created_at.strftime("%Y-%m-%d"), inline=True)
-        embed.add_field(name="Joined Server", value=member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "Unknown", inline=True)
+        embed = discord.Embed(title=f"Identity Profile Registry Data - {member.name}", color=DARK_COLOR)
+        embed.add_field(name="Unique Reference String ID", value=str(member.id), inline=True)
+        embed.add_field(name="Platform Initialization Date", value=member.created_at.strftime("%Y-%m-%d"), inline=True)
+        embed.add_field(name="Server Entry Timestamp Record", value=member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "Unknown", inline=True)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="serverinfo", aliases=["si"])
     async def m_serverinfo(self, ctx):
-        """Display configuration stats and setup metrics for the server."""
+        """Display organizational structures metadata tracking server configurations states."""
         g = ctx.guild
-        embed = discord.Embed(title=f"Server Info - {g.name}", color=DARK_COLOR)
-        embed.add_field(name="Server ID", value=str(g.id), inline=True)
-        embed.add_field(name="Total Members", value=str(g.member_count), inline=True)
+        embed = discord.Embed(title=f"Environment Analytics Dashboard - {g.name}", color=DARK_COLOR)
+        embed.add_field(name="Guild Identity Identifier Index Key", value=str(g.id), inline=True)
+        embed.add_field(name="Current Account Population Counts Metrics", value=str(g.member_count), inline=True)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="avatar", aliases=["av"])
-    @app_commands.describe(member="The member whose profile avatar icon you want to view")
+    @app_commands.describe(member="Target member account profile metadata context")
     async def m_avatar(self, ctx, member: discord.Member = None):
-        """Fetch and display a clean URL path link to a member's avatar icon asset."""
+        """Isolate dynamic identity display asset layouts paths straight out to targets files links."""
         member = member or ctx.author
-        embed = discord.Embed(title=f"Avatar Asset Link: {member.name}", color=DARK_COLOR)
+        embed = discord.Embed(title=f"Image Asset Links: {member.name}", color=DARK_COLOR)
         embed.set_image(url=member.display_avatar.url)
         await ctx.send(embed=embed)
 
@@ -172,18 +185,18 @@ class Moderation(commands.Cog):
 
     @commands.hybrid_group(name="music", invoke_without_command=True)
     async def music_placeholder(self, ctx):
-        """Music streaming distribution pipeline framework module."""
-        await ctx.send(embed=discord.Embed(description="Music streaming framework pipeline initialized successfully.", color=DARK_COLOR))
+        """Multimedia audio distribution pipeline rendering operations core systems framework node."""
+        await ctx.send(embed=discord.Embed(description="Multimedia stream pipeline system placeholder node initialization verified.", color=DARK_COLOR))
 
     @commands.hybrid_group(name="levels", invoke_without_command=True)
     async def levels_placeholder(self, ctx):
-        """User message activity tracking progression index module."""
-        await ctx.send(embed=discord.Embed(description="Level ranking progression calculations tracker verified.", color=DARK_COLOR))
+        """Activity engagement progression ranking calculations engines indexes modules."""
+        await ctx.send(embed=discord.Embed(description="Activity engagement progression metrics indexes database system structural profile placeholder node verified.", color=DARK_COLOR))
 
     @commands.hybrid_group(name="giveaways", invoke_without_command=True)
     async def giveaways_placeholder(self, ctx):
-        """Automated reward drawings scheduling manager framework module."""
-        await ctx.send(embed=discord.Embed(description="Automated promotional reward system configuration panel verified.", color=DARK_COLOR))
+        """Automated reward drawing matrices management tools subsystems."""
+        await ctx.send(embed=discord.Embed(description="Automated promotional distribution scheduling configuration platform matrix placeholder node verified.", color=DARK_COLOR))
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))
