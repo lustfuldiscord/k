@@ -119,3 +119,5 @@ CREATE TABLE IF NOT EXISTS honeypots (
     channel_id INTEGER,
     PRIMARY KEY (guild_id, channel_id)
 );
+
+ALTER TABLE guild_settings ADD COLUMN autorole_id INTEGER DEFAULT NULL;
