@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS guild_settings (
     jail_id INTEGER,
     jailmsg TEXT,
     welcome_channel_id INTEGER DEFAULT NULL,
-    autorole_id INTEGER DEFAULT NULL
+    autorole_id INTEGER DEFAULT NULL,
+    muterole_id INTEGER DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS user_prefixes (
@@ -119,7 +120,3 @@ CREATE TABLE IF NOT EXISTS honeypots (
     channel_id INTEGER,
     PRIMARY KEY (guild_id, channel_id)
 );
-
-ALTER TABLE guild_settings ADD COLUMN autorole_id INTEGER DEFAULT NULL;
-ALTER TABLE guild_settings ADD COLUMN muterole_id INTEGER DEFAULT NULL;
-ALTER TABLE guild_settings ADD COLUMN welcome_channel_id INTEGER DEFAULT NULL;
