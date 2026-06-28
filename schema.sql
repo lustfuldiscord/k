@@ -121,3 +121,5 @@ CREATE TABLE IF NOT EXISTS honeypots (
 );
 
 ALTER TABLE guild_settings ADD COLUMN autorole_id INTEGER DEFAULT NULL;
+ALTER TABLE guild_settings ADD COLUMN muterole_id INTEGER DEFAULT NULL;
+ALTER TABLE guild_settings ADD COLUMN welcome_channel_id INTEGER DEFAULT NULL;
