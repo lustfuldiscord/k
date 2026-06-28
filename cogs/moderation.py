@@ -118,7 +118,7 @@ class Moderation(commands.Cog):
     @app_commands.describe(member="Target account mapping profile", reason="Action parameters index rationale")
     async def m_jail(self, ctx, member: discord.Member, *, reason: str = "None"):
         """Route structural identities maps straight down inside holding patterns parameters channels."""
-        await ctx.send(embed=discord.Embed(description=f"Isolation processing targets successfully relocated out inside target cell space nodes loops targeting user: {member.mention}", color=DARK_COLOR))
+        await ctx.send(embed=discord.Embed(description=f"Jailed: {member.mention}", color=DARK_COLOR))
 
     @commands.hybrid_command(name="warn")
     @commands.has_permissions(manage_messages=True)
