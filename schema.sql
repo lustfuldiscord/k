@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS guild_settings (
     autoplay TEXT,
     jail_id INTEGER,
     jailmsg TEXT,
-    welcome_channel_id INTEGER DEFAULT NULL
+    welcome_channel_id INTEGER DEFAULT NULL,
+    autorole_id INTEGER DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS user_prefixes (
